@@ -5,6 +5,8 @@ import java.nio.ByteBuffer;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
+import org.apache.commons.math3.stat.regression.SimpleRegression;
+
 import vuforia.CubeShaders;
 import vuforia.SampleApplicationSession;
 import vuforia.SampleUtils;
@@ -48,7 +50,11 @@ public class CameraRenderer implements GLSurfaceView.Renderer
     private int texSampler2DHandle = 0;
     
 	Handler activityHandler = new Handler(Looper.getMainLooper());
-    
+	CameraCalibration cameraCalib;
+	private final int RGB565_FORMAT = 1;
+	private Bitmap cameraBitmap;
+	private Vec3F[] hemoLvlLocs;
+	private double[] hemoLevels;
     
     public CameraRenderer(CameraActivity activity,
         SampleApplicationSession session)
@@ -100,6 +106,25 @@ public class CameraRenderer implements GLSurfaceView.Renderer
     private void initRendering()
     {
         Log.d(LOGTAG, "initRendering");
+        
+        // get camera calibration
+        cameraCalib = CameraDevice.getInstance().getCameraCalibration();
+        
+        // initialize bitmap for analyzing
+        float[] res = cameraCalib.getSize().getData();
+        Log.d(LOGTAG, String.format("%.3f, %.3f", res[0], res[1]));
+        cameraBitmap = Bitmap.createBitmap((int) res[0], (int) res[1], 
+        		Bitmap.Config.RGB_565);
+        
+        // init hemoglobin levels: location on card
+        hemoLevels = new double[] {2, 4, 6, 8, 10};
+    	hemoLvlLocs = new Vec3F[5];
+    	hemoLvlLocs[0] = new Vec3F(-21.43f, 0, 0);
+    	hemoLvlLocs[1] = new Vec3F(-10.71f, 0, 0);
+    	hemoLvlLocs[2] = new Vec3F(0, 0, 0);
+    	hemoLvlLocs[3] = new Vec3F(10.71f, 0, 0);
+    	hemoLvlLocs[4] = new Vec3F(21.43f, 0, 0);
+    	
         
         // Define clear color
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, Vuforia.requiresAlpha() ? 0.0f
@@ -163,21 +188,27 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         	Marker trackable = (Marker) result.getTrackable();
         	
         	// get frame image into bitmap
-        	Bitmap cameraBitmap = getCameraBitmap(state);
+        	cameraBitmap = getCameraBitmap(state);
         	
         	// calculate region to analyze (testing first: dead center of target)
-        	Vec3F[] vectors = new Vec3F[5];
-        	vectors[0] = new Vec3F(-21.43f, 0, 0);
-        	vectors[1] = new Vec3F(-10.71f, 0, 0);
-        	vectors[2] = new Vec3F(0, 0, 0);
-        	vectors[3] = new Vec3F(10.71f, 0, 0);
-        	vectors[4] = new Vec3F(21.43f, 0, 0);
-        	int[] pixels = getPixelsOnBitmap(vectors, result.getPose(), cameraBitmap);
+        	int[] pixels = getPixelsOnBitmap(hemoLvlLocs, result.getPose());
+        	
+        	// get the reds
+        	int[] reds = new int[pixels.length];
+        	for (int i = 0; i < pixels.length; i++) {
+        		reds[i] = Color.red(pixels[i]);
+        	}
             
+        	// measured red component
+        	int measurement = 100;
+        	
+        	// fit least squares regression
+        	double count = hemoCountModel(reds, measurement);
+        	
         	// show on screen
-            message = String.format("%d, %d, %d, %d, %d", 
+            message = String.format("%d, %d, %d, %d, %d -- %.3f", 
             		Color.red(pixels[0]), Color.red(pixels[1]), Color.red(pixels[2]),
-            		Color.red(pixels[3]), Color.red(pixels[4])); 
+            		Color.red(pixels[3]), Color.red(pixels[4]), count); 
             pixel = pixels[2];
             
         	SampleUtils.checkGLError("FrameMarkers render frame");
@@ -197,21 +228,32 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         
     }
     
-    private int[] getPixelsOnBitmap(Vec3F[] vectors, Matrix34F pose, Bitmap bitmap) {
+    private double hemoCountModel(int[] pixels, int measurement) {
+    	SimpleRegression model = new SimpleRegression(true);
+    	double[][] data = new double[hemoLevels.length][2];
+    	for (int i = 0; i < hemoLevels.length; i++) {
+    		data[i][0] = (double) pixels[i];
+    		data[i][1] = (double) hemoLevels[i];
+    	}
+    	model.addData(data);
+    	return model.predict(measurement);
+    	
+    }
+    
+    private int[] getPixelsOnBitmap(Vec3F[] vectors, Matrix34F pose) {
         
     	int[] pixels = new int[vectors.length];
-    	CameraCalibration calib = CameraDevice.getInstance().getCameraCalibration();
     	
     	for (int i = 0; i < vectors.length; i++) {
-    		float[] point = Tool.projectPoint(calib, pose, vectors[i]).getData();
-    		pixels[i] = bitmap.getPixel(Math.round(point[0]), Math.round(point[1]));
+    		float[] point = Tool.projectPoint(cameraCalib, pose, vectors[i]).getData();
+    		pixels[i] = cameraBitmap
+    				.getPixel(Math.round(point[0]), Math.round(point[1]));
     	}
     	
     	return pixels;
     }
     
     private Bitmap getCameraBitmap(State state) {
-    	final int RGB565_FORMAT = 1;
     	
     	// get image
     	Image image = null;
@@ -225,10 +267,8 @@ public class CameraRenderer implements GLSurfaceView.Renderer
     	
     	if (image != null) {
     		ByteBuffer buffer = image.getPixels();
-    		Bitmap bitmap = Bitmap.createBitmap(image.getWidth(), image.getHeight(),
-    				Bitmap.Config.RGB_565);
-    		bitmap.copyPixelsFromBuffer(buffer);
-    		return bitmap;
+    		cameraBitmap.copyPixelsFromBuffer(buffer);
+    		return cameraBitmap;
     		
     	} else {
     		Log.e(LOGTAG, "image not found.");
