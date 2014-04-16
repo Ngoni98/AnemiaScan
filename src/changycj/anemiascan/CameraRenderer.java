@@ -1,46 +1,32 @@
 package changycj.anemiascan;
 
-import java.io.IOException;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.util.Vector;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 import vuforia.CubeShaders;
-import vuforia.LoadingDialogHandler;
-import vuforia.SampleApplication3DModel;
 import vuforia.SampleApplicationSession;
 import vuforia.SampleUtils;
-import vuforia.Teapot;
-import vuforia.Texture;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
-import android.opengl.Matrix;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.widget.TextView;
 
 import com.qualcomm.vuforia.CameraCalibration;
 import com.qualcomm.vuforia.CameraDevice;
 import com.qualcomm.vuforia.Frame;
 import com.qualcomm.vuforia.Image;
 import com.qualcomm.vuforia.Marker;
-import com.qualcomm.vuforia.MarkerResult;
-import com.qualcomm.vuforia.MarkerTracker;
 import com.qualcomm.vuforia.Matrix34F;
-import com.qualcomm.vuforia.Matrix44F;
 import com.qualcomm.vuforia.Renderer;
 import com.qualcomm.vuforia.State;
 import com.qualcomm.vuforia.Tool;
-import com.qualcomm.vuforia.Trackable;
 import com.qualcomm.vuforia.TrackableResult;
 import com.qualcomm.vuforia.VIDEO_BACKGROUND_REFLECTION;
-import com.qualcomm.vuforia.Vec2F;
 import com.qualcomm.vuforia.Vec3F;
 import com.qualcomm.vuforia.Vuforia;
 
@@ -179,19 +165,20 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         	// get frame image into bitmap
         	Bitmap cameraBitmap = getCameraBitmap(state);
         	
-        	// calculate region to analyze
-        	Vec3F cardCenterScene = new Vec3F(0, 0, 0);
-        	CameraCalibration calib = CameraDevice.getInstance().getCameraCalibration();
-            Matrix34F pose = result.getPose();
-            Vec2F cardCenter = Tool.projectPoint(calib, pose, cardCenterScene);
-
-        	// withdraw colors from the region
-            float[] center = cardCenter.getData();
-            pixel = cameraBitmap.getPixel(Math.round(center[0]), Math.round(center[1]));
+        	// calculate region to analyze (testing first: dead center of target)
+        	Vec3F[] vectors = new Vec3F[5];
+        	vectors[0] = new Vec3F(-21.43f, 0, 0);
+        	vectors[1] = new Vec3F(-10.71f, 0, 0);
+        	vectors[2] = new Vec3F(0, 0, 0);
+        	vectors[3] = new Vec3F(10.71f, 0, 0);
+        	vectors[4] = new Vec3F(21.43f, 0, 0);
+        	int[] pixels = getPixelsOnBitmap(vectors, result.getPose(), cameraBitmap);
             
         	// show on screen
-            message = String.format("%.3f, %.3f -- %d", center[0], center[1], Color.red(pixel));
-            
+            message = String.format("%d, %d, %d, %d, %d", 
+            		Color.red(pixels[0]), Color.red(pixels[1]), Color.red(pixels[2]),
+            		Color.red(pixels[3]), Color.red(pixels[4])); 
+            pixel = pixels[2];
             
         	SampleUtils.checkGLError("FrameMarkers render frame");
         } else {       	
@@ -208,6 +195,19 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);
         Renderer.getInstance().end();
         
+    }
+    
+    private int[] getPixelsOnBitmap(Vec3F[] vectors, Matrix34F pose, Bitmap bitmap) {
+        
+    	int[] pixels = new int[vectors.length];
+    	CameraCalibration calib = CameraDevice.getInstance().getCameraCalibration();
+    	
+    	for (int i = 0; i < vectors.length; i++) {
+    		float[] point = Tool.projectPoint(calib, pose, vectors[i]).getData();
+    		pixels[i] = bitmap.getPixel(Math.round(point[0]), Math.round(point[1]));
+    	}
+    	
+    	return pixels;
     }
     
     private Bitmap getCameraBitmap(State state) {
