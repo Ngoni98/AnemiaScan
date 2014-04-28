@@ -144,7 +144,7 @@ public class CameraActivity extends ActionBarActivity implements SampleApplicati
 				.getTracker(MarkerTracker.getClassType());
 		if (markerTracker == null) return false;
 				
-		dataSet = markerTracker.createFrameMarker(0, "card", new Vec2F(100, 100));
+		dataSet = markerTracker.createFrameMarker(0, "card", new Vec2F(7.25f, 7.25f));
 		if (dataSet == null) {
 			Log.e(TAG, "Failed to create frame marker.");
 			return false;

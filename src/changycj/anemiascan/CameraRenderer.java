@@ -1,19 +1,21 @@
 package changycj.anemiascan;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 
-import vuforia.CubeShaders;
 import vuforia.SampleApplicationSession;
 import vuforia.SampleUtils;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.opengl.Matrix;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -24,6 +26,7 @@ import com.qualcomm.vuforia.Frame;
 import com.qualcomm.vuforia.Image;
 import com.qualcomm.vuforia.Marker;
 import com.qualcomm.vuforia.Matrix34F;
+import com.qualcomm.vuforia.Rectangle;
 import com.qualcomm.vuforia.Renderer;
 import com.qualcomm.vuforia.State;
 import com.qualcomm.vuforia.Tool;
@@ -31,6 +34,8 @@ import com.qualcomm.vuforia.TrackableResult;
 import com.qualcomm.vuforia.VIDEO_BACKGROUND_REFLECTION;
 import com.qualcomm.vuforia.Vec3F;
 import com.qualcomm.vuforia.Vuforia;
+
+import vuforia.LineShaders;
 
 public class CameraRenderer implements GLSurfaceView.Renderer
 {
@@ -40,14 +45,6 @@ public class CameraRenderer implements GLSurfaceView.Renderer
     CameraActivity mActivity;
     
     public boolean mIsActive = false;
-        
-    // OpenGL ES 2.0 specific:
-    private int shaderProgramID = 0;
-    private int vertexHandle = 0;
-    private int normalHandle = 0;
-    private int textureCoordHandle = 0;
-    private int mvpMatrixHandle = 0;
-    private int texSampler2DHandle = 0;
     
 	Handler activityHandler = new Handler(Looper.getMainLooper());
 	CameraCalibration cameraCalib;
@@ -55,6 +52,16 @@ public class CameraRenderer implements GLSurfaceView.Renderer
 	private Bitmap cameraBitmap;
 	private Vec3F[] hemoLvlLocs;
 	private double[] hemoLevels;
+	private Vec3F measureLoc;
+	
+	// Open GL magic
+    private int vbShaderProgramID = 0;
+    private int vbVertexHandle = 0;   
+    private int lineOpacityHandle = 0;
+    private int lineColorHandle = 0;
+    private int mvpMatrixButtonsHandle = 0;
+    
+    private Rectangle[] renderRectangle;
     
     public CameraRenderer(CameraActivity activity,
         SampleApplicationSession session)
@@ -111,73 +118,62 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         cameraCalib = CameraDevice.getInstance().getCameraCalibration();
         
         // initialize bitmap for analyzing
-        float[] res = cameraCalib.getSize().getData();
-        Log.d(LOGTAG, String.format("%.3f, %.3f", res[0], res[1]));
-        cameraBitmap = Bitmap.createBitmap((int) res[0], (int) res[1], 
+        float[] resolution = cameraCalib.getSize().getData();
+        cameraBitmap = Bitmap.createBitmap((int) resolution[0], (int) resolution[1], 
         		Bitmap.Config.RGB_565);
         
         // init hemoglobin levels: location on card
-        hemoLevels = new double[] {2, 4, 6, 8, 10};
-    	hemoLvlLocs = new Vec3F[5];
-    	hemoLvlLocs[0] = new Vec3F(-21.43f, 0, 0);
-    	hemoLvlLocs[1] = new Vec3F(-10.71f, 0, 0);
-    	hemoLvlLocs[2] = new Vec3F(0, 0, 0);
-    	hemoLvlLocs[3] = new Vec3F(10.71f, 0, 0);
-    	hemoLvlLocs[4] = new Vec3F(21.43f, 0, 0);
+        hemoLevels = new double[] {4, 6, 8, 10, 12, 14};
+    	hemoLvlLocs = new Vec3F[6];
+    	hemoLvlLocs[0] = new Vec3F(-0.63f, -2.3f, 0);
+    	hemoLvlLocs[1] = new Vec3F(-0.63f, -1.38f, 0);
+    	hemoLvlLocs[2] = new Vec3F(-0.63f, -0.46f, 0);
+    	hemoLvlLocs[3] = new Vec3F(-0.63f, 0.46f, 0);
+    	hemoLvlLocs[4] = new Vec3F(-0.63f, 1.38f, 0);
+    	hemoLvlLocs[5] = new Vec3F(-0.63f, 2.3f, 0);  
     	
+    	measureLoc = new Vec3F(1.92f, 0, 0);
+    	
+    	// rectangles to render on frames
+    	renderRectangle = new Rectangle[2];
+    	renderRectangle[0] = new Rectangle(-2.08f, 2.76f, 0.84f, -2.76f);
+    	renderRectangle[1] = new Rectangle(1.52f, 0.4f, 2.22f, -0.4f);
         
-        // Define clear color
+    	// Open GL magic!
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, Vuforia.requiresAlpha() ? 0.0f
             : 1.0f);
-        
-        
-        shaderProgramID = SampleUtils.createProgramFromShaderSrc(
-            CubeShaders.CUBE_MESH_VERTEX_SHADER,
-            CubeShaders.CUBE_MESH_FRAGMENT_SHADER);
-        
-        vertexHandle = GLES20.glGetAttribLocation(shaderProgramID,
-            "vertexPosition");
-        normalHandle = GLES20.glGetAttribLocation(shaderProgramID,
-            "vertexNormal");
-        textureCoordHandle = GLES20.glGetAttribLocation(shaderProgramID,
-            "vertexTexCoord");
-        mvpMatrixHandle = GLES20.glGetUniformLocation(shaderProgramID,
-            "modelViewProjectionMatrix");
-        texSampler2DHandle = GLES20.glGetUniformLocation(shaderProgramID,
-            "texSampler2D");
+        vbShaderProgramID = SampleUtils.createProgramFromShaderSrc(
+               LineShaders.LINE_VERTEX_SHADER, LineShaders.LINE_FRAGMENT_SHADER);
+        vbVertexHandle = GLES20.glGetAttribLocation(vbShaderProgramID,
+                "vertexPosition");
+        mvpMatrixButtonsHandle = GLES20.glGetUniformLocation(vbShaderProgramID,
+                "modelViewProjectionMatrix");
+        lineOpacityHandle = GLES20.glGetUniformLocation(vbShaderProgramID,
+                "opacity");
+        lineColorHandle = GLES20.glGetUniformLocation(vbShaderProgramID,
+                "color");
     }
     
     
-    private void renderFrame()
-    {
-        // Clear color and depth buffer
+    private void renderFrame() {
+    	
+    	// Open GL initializing stuff magic
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-        
-        // Get the state from Vuforia and mark the beginning of a rendering
-        // section
         State state = Renderer.getInstance().begin();
-        
-        // Explicitly render the Video Background
         Renderer.getInstance().drawVideoBackground();
-        
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-        
-        // We must detect if background reflection is active and adjust the
-        // culling direction.
-        // If the reflection is active, this means the post matrix has been
-        // reflected as well,
-        // therefore standard counter clockwise face culling will result in
-        // "inside out" models.
         GLES20.glEnable(GLES20.GL_CULL_FACE);
         GLES20.glCullFace(GLES20.GL_BACK);
-        if (Renderer.getInstance().getVideoBackgroundConfig().getReflection() == VIDEO_BACKGROUND_REFLECTION.VIDEO_BACKGROUND_REFLECTION_ON)
+        if (Renderer.getInstance().getVideoBackgroundConfig().getReflection() 
+        		== VIDEO_BACKGROUND_REFLECTION.VIDEO_BACKGROUND_REFLECTION_ON)
             GLES20.glFrontFace(GLES20.GL_CW);  // Front camera
         else
             GLES20.glFrontFace(GLES20.GL_CCW);   // Back camera
+    	
 
         // Did we find any trackables this frame?
         int tNum = state.getNumTrackableResults();
-        final String message;
+        final String message; 
         final int pixel;
         
         // 1 diagnostic card found
@@ -186,6 +182,32 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         	// get trackables
         	TrackableResult result = state.getTrackableResult(0);
         	Marker trackable = (Marker) result.getTrackable();
+        	
+        	float[] modelViewMatrix = Tool.convertPose2GLMatrix(result.getPose()).getData();
+        	
+        	float[] modelViewProjection = new float[16];
+            Matrix.multiplyMM(modelViewProjection, 0, vuforiaAppSession
+                .getProjectionMatrix().getData(), 0, modelViewMatrix, 0);
+        	
+            float[] vbVertices = initGLVertices();
+
+                
+            // Render frame around button
+            GLES20.glUseProgram(vbShaderProgramID);
+                
+            GLES20.glVertexAttribPointer(vbVertexHandle, 3,
+            		GLES20.GL_FLOAT, false, 0, fillBuffer(vbVertices));
+                
+            GLES20.glEnableVertexAttribArray(vbVertexHandle);
+            GLES20.glUniform1f(lineOpacityHandle, 1.0f);
+            GLES20.glUniform3f(lineColorHandle, 1.0f, 1.0f, 1.0f);
+                
+            GLES20.glUniformMatrix4fv(mvpMatrixButtonsHandle, 1, false,
+                modelViewProjection, 0);
+                
+            GLES20.glDrawArrays(GLES20.GL_LINES, 0, 8 * renderRectangle.length);
+            GLES20.glDisableVertexAttribArray(vbVertexHandle);
+            
         	
         	// get frame image into bitmap
         	cameraBitmap = getCameraBitmap(state);
@@ -200,16 +222,16 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         	}
             
         	// measured red component
-        	int measurement = 100;
+        	int measuredPixel = getPixelsOnBitmap(new Vec3F[]{measureLoc}, result.getPose())[0];
         	
         	// fit least squares regression
-        	double count = hemoCountModel(reds, measurement);
+        	double count = hemoCountModel(reds, Color.red(measuredPixel));
         	
         	// show on screen
-            message = String.format("%d, %d, %d, %d, %d -- %.3f", 
+            message = String.format("%d, %d, %d, %d, %d, %d -- %.3f", 
             		Color.red(pixels[0]), Color.red(pixels[1]), Color.red(pixels[2]),
-            		Color.red(pixels[3]), Color.red(pixels[4]), count); 
-            pixel = pixels[2];
+            		Color.red(pixels[3]), Color.red(pixels[4]), Color.red(pixels[5]), count); 
+            pixel = measuredPixel;
             
         	SampleUtils.checkGLError("FrameMarkers render frame");
         } else {       	
@@ -228,6 +250,50 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         
     }
     
+    private float[] initGLVertices() {
+    	float[] vertices = new float[renderRectangle.length * 24];
+    	int vInd = 0;   	
+    	
+    	for (Rectangle rect : renderRectangle) {
+    		vertices[vInd] = rect.getLeftTopX();
+            vertices[vInd + 1] = rect.getLeftTopY();
+            vertices[vInd + 2] = 0.0f;
+            vertices[vInd + 3] = rect.getRightBottomX();
+            
+            vertices[vInd + 4] = rect.getLeftTopY();
+            vertices[vInd + 5] = 0.0f;
+            vertices[vInd + 6] = rect.getRightBottomX();
+            vertices[vInd + 7] = rect.getLeftTopY();
+            vertices[vInd + 8] = 0.0f;
+            vertices[vInd + 9] = rect.getRightBottomX();
+            vertices[vInd + 10] = rect.getRightBottomY();
+            vertices[vInd + 11] = 0.0f;
+            vertices[vInd + 12] = rect.getRightBottomX();
+            vertices[vInd + 13] = rect.getRightBottomY();
+            vertices[vInd + 14] = 0.0f;
+            vertices[vInd + 15] = rect.getLeftTopX();
+            vertices[vInd + 16] = rect.getRightBottomY();
+            vertices[vInd + 17] = 0.0f;
+            vertices[vInd + 18] = rect.getLeftTopX();
+            vertices[vInd + 19] = rect.getRightBottomY();
+            vertices[vInd + 20] = 0.0f;
+            vertices[vInd + 21] = rect.getLeftTopX();
+            vertices[vInd + 22] = rect.getLeftTopY();
+            vertices[vInd + 23] = 0.0f;
+            vInd += 24;
+    	}    	
+    	return vertices;
+    }
+    
+    private Buffer fillBuffer(float[] array) {
+        ByteBuffer bb = ByteBuffer.allocateDirect(4 * array.length); 
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        for (float d : array)
+            bb.putFloat(d);
+        bb.rewind();       
+        return bb;   
+    }
+    
     private double hemoCountModel(int[] pixels, int measurement) {
     	SimpleRegression model = new SimpleRegression(true);
     	double[][] data = new double[hemoLevels.length][2];
@@ -237,9 +303,8 @@ public class CameraRenderer implements GLSurfaceView.Renderer
     	}
     	model.addData(data);
     	return model.predict(measurement);
-    	
     }
-    
+    	
     private int[] getPixelsOnBitmap(Vec3F[] vectors, Matrix34F pose) {
         
     	int[] pixels = new int[vectors.length];
