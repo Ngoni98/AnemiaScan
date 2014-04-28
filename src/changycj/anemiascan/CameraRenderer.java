@@ -50,7 +50,7 @@ public class CameraRenderer implements GLSurfaceView.Renderer
 	CameraCalibration cameraCalib;
 	private final int RGB565_FORMAT = 1;
 	private Bitmap cameraBitmap;
-	private Vec3F[] hemoLvlLocs;
+	private Vec3F[][] hemoLvlLocs;
 	private double[] hemoLevels;
 	private Vec3F measureLoc;
 	
@@ -124,13 +124,13 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         
         // init hemoglobin levels: location on card
         hemoLevels = new double[] {4, 6, 8, 10, 12, 14};
-    	hemoLvlLocs = new Vec3F[6];
-    	hemoLvlLocs[0] = new Vec3F(-0.63f, -2.3f, 0);
-    	hemoLvlLocs[1] = new Vec3F(-0.63f, -1.38f, 0);
-    	hemoLvlLocs[2] = new Vec3F(-0.63f, -0.46f, 0);
-    	hemoLvlLocs[3] = new Vec3F(-0.63f, 0.46f, 0);
-    	hemoLvlLocs[4] = new Vec3F(-0.63f, 1.38f, 0);
-    	hemoLvlLocs[5] = new Vec3F(-0.63f, 2.3f, 0);  
+    	hemoLvlLocs = new Vec3F[6][];
+    	hemoLvlLocs[0] = getHemoLvlArea(-0.63f, -2.3f, 0);
+    	hemoLvlLocs[1] = getHemoLvlArea(-0.63f, -1.38f, 0);
+    	hemoLvlLocs[2] = getHemoLvlArea(-0.63f, -0.46f, 0);
+    	hemoLvlLocs[3] = getHemoLvlArea(-0.63f, 0.46f, 0);
+    	hemoLvlLocs[4] = getHemoLvlArea(-0.63f, 1.38f, 0);
+    	hemoLvlLocs[5] = getHemoLvlArea(-0.63f, 2.3f, 0);  
     	
     	measureLoc = new Vec3F(1.92f, 0, 0);
     	
@@ -166,6 +166,17 @@ public class CameraRenderer implements GLSurfaceView.Renderer
                 "color");
     }
     
+    private Vec3F[] getHemoLvlArea(float cx, float cy, float cz) {
+    	Vec3F[] samples = new Vec3F[9];
+    	int r = 3, c = 3;
+    	for (int i = 0; i < r; i++) {
+    		for (int j = 0; j < c; j++) {
+    			samples[i * r + j] = new Vec3F(cx + (i - 1) * 0.1f, cy + (j-1) * 0.1f, cz);
+    		} 
+    	}
+    	return samples;
+    }
+    
     
     private void renderFrame() {
     	
@@ -194,6 +205,7 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         	// get trackables
         	TrackableResult result = state.getTrackableResult(0);
         	Marker trackable = (Marker) result.getTrackable();
+        	Matrix34F pose = result.getPose();
         	
         	float[] modelViewMatrix = Tool.convertPose2GLMatrix(result.getPose()).getData();
         	
@@ -224,25 +236,23 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         	// get frame image into bitmap
         	cameraBitmap = getCameraBitmap(state);
         	
-        	// calculate region to analyze (testing first: dead center of target)
-        	int[] pixels = getPixelsOnBitmap(hemoLvlLocs, result.getPose());
-        	
-        	// get the reds
-        	int[] reds = new int[pixels.length];
-        	for (int i = 0; i < pixels.length; i++) {
-        		reds[i] = Color.red(pixels[i]);
+        	// analyze each level, and get average red value
+        	int[] reds = new int[hemoLevels.length];
+        	for (int i = 0; i < hemoLevels.length; i++) {
+        		int[] ps = getPixelsOnBitmap(hemoLvlLocs[i], pose);
+        		reds[i] = averageRed(ps);
         	}
             
         	// measured red component
-        	int measuredPixel = getPixelsOnBitmap(new Vec3F[]{measureLoc}, result.getPose())[0];
+        	int measuredPixel = getPixelsOnBitmap(new Vec3F[]{measureLoc}, pose)[0];
         	
         	// fit least squares regression
         	double count = hemoCountModel(reds, Color.red(measuredPixel));
         	
         	// show on screen
             message = String.format("%d, %d, %d, %d, %d, %d -- %.3f", 
-            		Color.red(pixels[0]), Color.red(pixels[1]), Color.red(pixels[2]),
-            		Color.red(pixels[3]), Color.red(pixels[4]), Color.red(pixels[5]), count); 
+            		reds[0], reds[1], reds[2],
+            		reds[3], reds[4], reds[5], count); 
             pixel = measuredPixel;
             
         	SampleUtils.checkGLError("FrameMarkers render frame");
@@ -260,6 +270,14 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);
         Renderer.getInstance().end();
         
+    }
+    
+    private int averageRed(int[] pixels) {
+    	int sum = 0;
+    	for (int i = 0; i < pixels.length; i++) {
+    		sum += Color.red(pixels[i]);
+    	}
+    	return sum / pixels.length;
     }
     
     private float[] initGLVertices() {
