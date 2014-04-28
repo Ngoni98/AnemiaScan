@@ -135,9 +135,21 @@ public class CameraRenderer implements GLSurfaceView.Renderer
     	measureLoc = new Vec3F(1.92f, 0, 0);
     	
     	// rectangles to render on frames
-    	renderRectangle = new Rectangle[2];
-    	renderRectangle[0] = new Rectangle(-2.08f, 2.76f, 0.84f, -2.76f);
-    	renderRectangle[1] = new Rectangle(1.52f, 0.4f, 2.22f, -0.4f);
+    	renderRectangle = new Rectangle[8];
+    	
+    	// red color scale bars
+    	renderRectangle[0] = new Rectangle(-2.08f, 2.76f, 0.84f, 1.84f);
+    	renderRectangle[1] = new Rectangle(-2.08f, 1.84f, 0.84f, 0.92f);
+    	renderRectangle[2] = new Rectangle(-2.08f, 0.92f, 0.84f, 0f);
+    	renderRectangle[3] = new Rectangle(-2.08f, 0f, 0.84f, -0.92f);
+    	renderRectangle[4] = new Rectangle(-2.08f, -0.92f, 0.84f, -1.84f);
+    	renderRectangle[5] = new Rectangle(-2.08f, -1.84f, 0.84f, -2.76f);
+    	
+    	// the green circle
+    	renderRectangle[6] = new Rectangle(1.52f, 0.4f, 2.22f, -0.4f);
+    	
+    	// the entire target
+    	renderRectangle[7] = new Rectangle(-3.625f, 3.625f, 3.625f, -3.625f);
         
     	// Open GL magic!
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, Vuforia.requiresAlpha() ? 0.0f
