@@ -4,5 +4,35 @@
     <string name="app_name">AnemiaScan</string>
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
-
+    <string name="title_activity_main">MainActivity</string>
+    
+    <string name="sign_in_title_string">AnemiaScan</string>
+    <string name="sign_in_enter_info_string">Enter Patient Information: </string>
+    <string name="sign_in_patient_name_string">Name: </string>
+    <string name="sign_in_patient_id_string">ID: </string>
+    <string name="sign_in_start_scan_string">Start</string>
+    <string name="sign_in_instructions_string">Instructions</string>
+    <string name="instructions_string">
+        This app utilizes a standard color scale to estimate hemoglobin level.
+        This software uses a multiple linear gression to analyze the RGB color values
+        from the calibration colors on the left and interpolates the blood spot\'s hemoglobin 
+        value on the right. \n \n
+        
+        Step 1: Enter patient name and ID on the main screen. Press Start. \n \n
+        Step 2: Finger prick the patient and place a drop of blood on the filter paper. Press Scan. \n \n
+        Step 3: Position the camera roughly parallel above to the card. Make sure the camera can
+        	capture the entire card on the screen. \n \n
+        Step 4: Press Measure to take a measurement. \n \n
+    </string>
+    <string name="prick_string">
+        Finger prick the patient and place a drop of blood on the filter paper. 
+        Then press Scan. 
+    </string>        
+    <string name="prick_next_string">Next</string>
+    
+    <string name="camera_measure_string">Measure</string>
+    
+    <string name="result_diagnosis_label_string">Diagnosis</string>
+	<string name="result_measurement_label_string">Hemoglobin Level</string>
+	<string name="result_main_menu_string">Main Menu</string>
 </resources>

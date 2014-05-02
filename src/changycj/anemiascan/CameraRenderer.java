@@ -37,8 +37,7 @@ import com.qualcomm.vuforia.Vuforia;
 
 import vuforia.LineShaders;
 
-public class CameraRenderer implements GLSurfaceView.Renderer
-{
+public class CameraRenderer implements GLSurfaceView.Renderer {
     private static final String LOGTAG = "CameraRenderer";
     
     SampleApplicationSession vuforiaAppSession;
@@ -53,6 +52,7 @@ public class CameraRenderer implements GLSurfaceView.Renderer
 	private Vec3F[][] hemoLvlLocs;
 	private double[] hemoLevels;
 	private Vec3F measureLoc;
+	private double hemoCount;
 	
 	// Open GL magic
     private int vbShaderProgramID = 0;
@@ -69,8 +69,7 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         mActivity = activity;
         vuforiaAppSession = session;
     }
-    
-    
+       
     // Called when the surface is created or recreated.
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config)
@@ -84,8 +83,7 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         // or after OpenGL ES context was lost (e.g. after onPause/onResume):
         vuforiaAppSession.onSurfaceCreated();
     }
-    
-    
+        
     // Called when the surface changed size.
     @Override
     public void onSurfaceChanged(GL10 gl, int width, int height)
@@ -95,8 +93,7 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         // Call Vuforia function to handle render surface size changes:
         vuforiaAppSession.onSurfaceChanged(width, height);
     }
-    
-    
+        
     // Called to draw the current frame.
     @Override
     public void onDrawFrame(GL10 gl)
@@ -108,8 +105,7 @@ public class CameraRenderer implements GLSurfaceView.Renderer
         // Call our function to render content
         renderFrame();
     }
-    
-    
+        
     private void initRendering()
     {
         Log.d(LOGTAG, "initRendering");
@@ -176,13 +172,13 @@ public class CameraRenderer implements GLSurfaceView.Renderer
     	}
     	return samples;
     }
-    
-    
+       
     private void renderFrame() {
     	
     	// Open GL initializing stuff magic
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         State state = Renderer.getInstance().begin();
+        
         Renderer.getInstance().drawVideoBackground();
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         GLES20.glEnable(GLES20.GL_CULL_FACE);
@@ -196,16 +192,12 @@ public class CameraRenderer implements GLSurfaceView.Renderer
 
         // Did we find any trackables this frame?
         int tNum = state.getNumTrackableResults();
-        final String message; 
-        final int pixel;
         
         // 1 diagnostic card found
         if (tNum == 1) {
         	
         	// get trackables
         	TrackableResult result = state.getTrackableResult(0);
-        	Marker trackable = (Marker) result.getTrackable();
-        	Matrix34F pose = result.getPose();
         	
         	float[] modelViewMatrix = Tool.convertPose2GLMatrix(result.getPose()).getData();
         	
@@ -230,54 +222,65 @@ public class CameraRenderer implements GLSurfaceView.Renderer
                 modelViewProjection, 0);
                 
             GLES20.glDrawArrays(GLES20.GL_LINES, 0, 8 * renderRectangle.length);
-            GLES20.glDisableVertexAttribArray(vbVertexHandle);
+            GLES20.glDisableVertexAttribArray(vbVertexHandle);        
             
-        	
-        	// get frame image into bitmap
+            // get frame image into bitmap
         	cameraBitmap = getCameraBitmap(state);
-        	
+        	Matrix34F pose = state.getTrackableResult(0).getPose();
+        	        	
         	// analyze each level, and get average red value
-        	int[] reds = new int[hemoLevels.length];
+        	int[][] pixels = new int[hemoLevels.length][];
         	for (int i = 0; i < hemoLevels.length; i++) {
         		int[] ps = getPixelsOnBitmap(hemoLvlLocs[i], pose);
-        		reds[i] = averageRed(ps);
+        		pixels[i] = averagePixels(ps);
+        	}
+        	
+        	int[] reds = new int[hemoLevels.length];
+        	for (int i = 0; i < hemoLevels.length; i++) {
+        		reds[i] = pixels[i][0];
         	}
             
         	// measured red component
         	int measuredPixel = getPixelsOnBitmap(new Vec3F[]{measureLoc}, pose)[0];
         	
         	// fit least squares regression
-        	double count = hemoCountModel(reds, Color.red(measuredPixel));
-        	
-        	// show on screen
-            message = String.format("%d, %d, %d, %d, %d, %d -- %.3f", 
+        	hemoCount = hemoCountModel(reds, Color.red(measuredPixel));
+            
+            final String message = String.format("%d, %d, %d, %d, %d, %d -- %.3f", 
             		reds[0], reds[1], reds[2],
-            		reds[3], reds[4], reds[5], count); 
-            pixel = measuredPixel;
+            		reds[3], reds[4], reds[5], hemoCount); 
+            final int pixel = measuredPixel;
+        	
+        	activityHandler.post(new Runnable() {
+        		public void run() {
+                	// show on screen
+        			mActivity.updateHemoCount(message, pixel);
+        		}
+        	});
             
         	SampleUtils.checkGLError("FrameMarkers render frame");
-        } else {       	
-        	message = "LALALLALALLALA";
-        	pixel = 0;
         }
-        
-    	activityHandler.post(new Runnable() {
-    		public void run() {
-    			mActivity.updateHemoCount(message, pixel);
-    		}
-    	});
-        
+       
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);
         Renderer.getInstance().end();
         
     }
     
-    private int averageRed(int[] pixels) {
-    	int sum = 0;
+    public double getHemoCount() {   	   	
+    	return hemoCount;
+    }
+    
+    private int[] averagePixels(int[] pixels) {
+    	int redSum = 0;
+    	int blueSum = 0;
+    	int greenSum = 0;
     	for (int i = 0; i < pixels.length; i++) {
-    		sum += Color.red(pixels[i]);
+    		redSum += Color.red(pixels[i]);
+    		blueSum += Color.blue(pixels[i]);
+    		greenSum += Color.green(pixels[i]);
     	}
-    	return sum / pixels.length;
+    	return new int[] {redSum / pixels.length, greenSum / pixels.length, blueSum / pixels.length};
+
     }
     
     private float[] initGLVertices() {

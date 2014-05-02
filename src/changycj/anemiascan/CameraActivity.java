@@ -15,6 +15,8 @@ import vuforia.SampleApplicationException;
 import vuforia.SampleApplicationGLView;
 import vuforia.SampleApplicationSession;
 import android.support.v7.app.ActionBarActivity;
+import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
@@ -22,20 +24,25 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup.LayoutParams;
+import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-public class CameraActivity extends ActionBarActivity implements SampleApplicationControl{
+public class CameraActivity extends ActionBarActivity 
+			implements SampleApplicationControl, OnClickListener{
 	private static final String TAG = "CameraActivity";
 
 	SampleApplicationSession vuforiaAppSession;
 	
 	private Marker dataSet;
 	private CameraRenderer mRenderer;
+	private Button measureButton;
 	
 	boolean mIsDroidDevice = false;
 	boolean mContAutofocus = false;
+	boolean targetVisible = false;
 	private RelativeLayout mUILayout;
 	private SampleApplicationGLView mGlView;
     LoadingDialogHandler loadingDialogHandler = new LoadingDialogHandler(this);
@@ -49,12 +56,15 @@ public class CameraActivity extends ActionBarActivity implements SampleApplicati
 		
         startLoadingAnimation();
 		
-		vuforiaAppSession.initAR(this, ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+		vuforiaAppSession.initAR(this, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 		
 //        mGestureDetector = new GestureDetector(this, new GestureListener());
         
         mIsDroidDevice = android.os.Build.MODEL.toLowerCase().startsWith(
             "droid");
+        
+        measureButton = (Button) findViewById(R.id.camera_measure);
+        measureButton.setOnClickListener(this);
 		
 	}
 	
@@ -237,7 +247,9 @@ public class CameraActivity extends ActionBarActivity implements SampleApplicati
 	}
 
 	@Override
-	public void onQCARUpdate(State state) {	}
+	public void onQCARUpdate(State state) {
+		targetVisible = (state.getNumTrackableResults() > 0);
+	}
 	
 	private void startLoadingAnimation() {
         LayoutInflater inflater = LayoutInflater.from(this);
@@ -277,5 +289,17 @@ public class CameraActivity extends ActionBarActivity implements SampleApplicati
         TextView text = (TextView) findViewById(R.id.hemoglobin_count);
         text.setText(count);
         text.setTextColor(pixel);
+	}
+
+	@Override
+	public void onClick(View v) {
+		if (targetVisible) {
+			double count = mRenderer.getHemoCount();
+			
+			Intent intent = new Intent();
+			intent.putExtra("hemoCount", count);
+			setResult(Activity.RESULT_OK, intent);
+			finish();
+		}
 	}
 }
