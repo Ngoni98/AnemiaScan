@@ -1,6 +1,7 @@
 package changycj.anemiascan;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -10,6 +11,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 
 public class PrickFragment extends Fragment implements OnClickListener{
@@ -26,6 +28,9 @@ public class PrickFragment extends Fragment implements OnClickListener{
 		prickNextButton = (Button) rootView.findViewById(R.id.prick_next);
 		prickNextButton.setOnClickListener(this);
 		
+		((InputMethodManager)getActivity().getSystemService(Context.INPUT_METHOD_SERVICE))
+			.hideSoftInputFromWindow(rootView.getWindowToken(),0);
+		
 		return rootView;
 	}
 	
@@ -33,9 +38,16 @@ public class PrickFragment extends Fragment implements OnClickListener{
 	public void onActivityResult(int requestCode, int resultCode, Intent data) {
 		if (requestCode == CAMERA_ACTIVITY_REQUEST_CODE) {
 			if (resultCode == Activity.RESULT_OK) {
+				Bundle args = getArguments();
+				String patientName = args.getString("patientName");
+				String patientId = args.getString("patientId");
+				
 				double count = data.getDoubleExtra("hemoCount", 0.0);
+				
 				Bundle bundle = new Bundle();
 				bundle.putDouble("hemoCount", count);
+				bundle.putString("patientName", patientName);
+				bundle.putString("patientId", patientId);
 				
 				ResultFragment result = new ResultFragment();
 				result.setArguments(bundle);
