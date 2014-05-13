@@ -24,7 +24,6 @@ import com.qualcomm.vuforia.CameraCalibration;
 import com.qualcomm.vuforia.CameraDevice;
 import com.qualcomm.vuforia.Frame;
 import com.qualcomm.vuforia.Image;
-import com.qualcomm.vuforia.Marker;
 import com.qualcomm.vuforia.Matrix34F;
 import com.qualcomm.vuforia.Rectangle;
 import com.qualcomm.vuforia.Renderer;
@@ -53,6 +52,8 @@ public class CameraRenderer implements GLSurfaceView.Renderer {
 	private double[] hemoLevels;
 	private Vec3F measureLoc;
 	private double hemoCount;
+	private int[][] hemoPixels;
+	private int hemoMeasure;
 	
 	// Open GL magic
     private int vbShaderProgramID = 0;
@@ -245,6 +246,8 @@ public class CameraRenderer implements GLSurfaceView.Renderer {
         	
         	// fit least squares regression
         	hemoCount = hemoCountModel(reds, Color.red(measuredPixel));
+        	hemoMeasure = measuredPixel;
+        	hemoPixels = pixels;
             
             final String message = String.format("%d, %d, %d, %d, %d, %d -- %.3f", 
             		reds[0], reds[1], reds[2],
@@ -268,6 +271,21 @@ public class CameraRenderer implements GLSurfaceView.Renderer {
     
     public double getHemoCount() {   	   	
     	return hemoCount;
+    }
+    
+    public String[] getHemoPixels() {
+    	String[] result = new String[hemoLevels.length];
+    	for (int i = 0; i < result.length; i++) {
+    		result[i] = String.format("%d#%d#%d#%d", (int) hemoLevels[i], hemoPixels[i][0], 
+    				hemoPixels[i][1], hemoPixels[i][2]);
+    	}
+    	
+    	return result;
+    }
+    
+    public String getHemoMeasure() {
+    	return String.format("%.3f#%d#%d#%d", hemoCount, Color.red(hemoMeasure),
+    			Color.green(hemoMeasure), Color.blue(hemoMeasure));
     }
     
     private int[] averagePixels(int[] pixels) {

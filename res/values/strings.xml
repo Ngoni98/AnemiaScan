@@ -11,13 +11,13 @@
     <string name="sign_in_patient_name_string">Name: </string>
     <string name="sign_in_patient_id_string">ID: </string>
     <string name="sign_in_start_scan_string">Start</string>
-    <string name="sign_in_instructions_string">Instructions</string>
+    <string name="sign_in_instructions_string">Tutorial</string>
+    <string name="sign_in_history_string">History</string>
     <string name="instructions_string">
         This app utilizes a standard color scale to estimate hemoglobin level.
         This software uses a multiple linear gression to analyze the RGB color values
         from the calibration colors on the left and interpolates the blood spot\'s hemoglobin 
-        value on the right. \n \n
-        
+        value on the right. \n \n        
         Step 1: Enter patient name and ID on the main screen. Press Start. \n \n
         Step 2: Finger prick the patient and place a drop of blood on the filter paper. Press Scan. \n \n
         Step 3: Position the camera roughly parallel above to the card. Make sure the camera can
@@ -35,4 +35,9 @@
     <string name="result_diagnosis_label_string">Diagnosis</string>
 	<string name="result_measurement_label_string">Hemoglobin Level</string>
 	<string name="result_main_menu_string">Main Menu</string>
+	<string name="viewfile_patient_id_string">ID: </string>
+	<string name="viewfile_patient_name_string">Name: </string>
+	<string name="viewfile_date_string">Date: </string>
+	<string name="viewfile_calibration_string">Calibration: </string>
+	
 </resources>

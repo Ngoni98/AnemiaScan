@@ -29,8 +29,8 @@
         android:id="@+id/sign_in_patient_name"
         android:layout_width="200dp"
         android:layout_height="wrap_content"
+        android:layout_alignRight="@+id/sign_in_patient_id"
         android:layout_below="@id/sign_in_enter_info"
-        android:layout_centerHorizontal="true"
         android:hint="@string/sign_in_patient_name_string" />
     
     <EditText
@@ -41,30 +41,31 @@
         android:layout_centerHorizontal="true"
         android:hint="@string/sign_in_patient_id_string"
         android:inputType="number" />
-    
+
     <Button
         android:id="@+id/sign_in_start_scan"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@id/sign_in_patient_id"
-        android:layout_centerHorizontal="true"
+        android:layout_alignLeft="@+id/sign_in_patient_id"
+        android:layout_alignRight="@+id/sign_in_patient_id"
+        android:layout_below="@+id/sign_in_patient_id"
         android:text="@string/sign_in_start_scan_string" />
-    
-<!--     <Button 
-        android:id="@+id/view_old_scans"
-        android:text="@string/history"
+
+    <Button
+        android:id="@+id/sign_in_history"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_toRightOf="@id/enter_new_scans"
-        android:layout_below="@id/patient_id"
-        android:onClick="history"/> -->
+        android:layout_alignLeft="@+id/sign_in_patient_id"
+        android:layout_below="@+id/sign_in_start_scan"
+        android:text="@string/sign_in_history_string" />
 
     <Button
         android:id="@+id/sign_in_instructions"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@id/sign_in_start_scan"
-        android:layout_centerHorizontal="true"
+        android:layout_alignRight="@+id/sign_in_start_scan"
+        android:layout_below="@+id/sign_in_start_scan"
+        android:layout_toRightOf="@+id/sign_in_history"
         android:text="@string/sign_in_instructions_string" />
 
 </RelativeLayout>

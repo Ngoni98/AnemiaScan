@@ -1,6 +1,13 @@
 package changycj.anemiascan;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
@@ -11,6 +18,7 @@ import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
+import au.com.bytecode.opencsv.CSVWriter;
 
 public class ResultFragment extends Fragment implements OnClickListener{
 
@@ -23,8 +31,10 @@ public class ResultFragment extends Fragment implements OnClickListener{
 		
 		Bundle args = getArguments();
 		double hemoCount = args.getDouble("hemoCount");
+		String[] hemoPixels = args.getStringArray("hemoPixels");
 		String patientName = args.getString("patientName");
 		String patientId = args.getString("patientId");
+		String hemoMeasure = args.getString("hemoMeasure");
 		
 		TextView name = (TextView) rootView.findViewById(R.id.result_patient_info);
 		name.setText(String.format("%s - #%s", patientName, patientId));
@@ -46,8 +56,55 @@ public class ResultFragment extends Fragment implements OnClickListener{
 		
 		mainMenuButton = (Button) rootView.findViewById(R.id.result_main_menu);
 		mainMenuButton.setOnClickListener(this);
-
+		
+		saveData(patientId, patientName, hemoPixels, hemoCount, hemoMeasure);
+		
 		return rootView;
+	}
+	
+	public void saveData(String patientId, String patientName, 
+			String[] hemoPixels, double hemoCount, String hemoMeasure) {
+		String state = Environment.getExternalStorageState();
+		if (Environment.MEDIA_MOUNTED.equals(state)) {
+			
+			// try to create main directory
+			File mainDir = new File(Environment.getExternalStoragePublicDirectory(
+					Environment.DIRECTORY_DOWNLOADS), "AnemiaScan");			
+			if (!mainDir.mkdirs()) {
+				Log.e("ResultFragment", "Main directory not created");
+			}
+			
+			// try to create patient directory
+			File patientDir = new File(mainDir, String.format("%s_%s", patientId, patientName));
+			if (!patientDir.mkdirs()) {
+				Log.e("ResultFragment", "Patient directory not created");
+			}
+			
+			// create the file
+			// first make sure directory exists
+			if (mainDir.exists() && patientDir.exists()) {
+				Log.d("ResultFragment", "yay successful!");
+		        String date = new SimpleDateFormat("yyyyMMddhhmmss").format(new Date());
+				String filename = patientDir.getPath() + File.separator + 
+						patientId + "_" + date + ".csv";
+				
+				try {
+					CSVWriter writer = new CSVWriter(new FileWriter(filename));
+					writer.writeNext(new String[] {"HemoCount", "Red", "Green", "Blue"});
+					for (String pixelString : hemoPixels) {
+						writer.writeNext(pixelString.split("#"));
+					}
+					writer.writeNext(hemoMeasure.split("#"));
+					writer.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+					Log.e("ResultFragment", "uh oh :(");
+				}
+
+			} else {
+				Log.e("ResultFragment", "oh no :(");
+			}
+		}
 	}
 	
 	
@@ -61,4 +118,5 @@ public class ResultFragment extends Fragment implements OnClickListener{
 		trans.addToBackStack(null);
 		trans.commit();
 	}
+	
 }

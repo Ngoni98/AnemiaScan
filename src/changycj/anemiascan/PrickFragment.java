@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -17,7 +16,6 @@ import android.widget.Button;
 public class PrickFragment extends Fragment implements OnClickListener{
 	private Button prickNextButton;
 	private final static int CAMERA_ACTIVITY_REQUEST_CODE = 1;
-	private final String TAG = "PrickFragment";
 	
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -43,12 +41,15 @@ public class PrickFragment extends Fragment implements OnClickListener{
 				String patientId = args.getString("patientId");
 				
 				double count = data.getDoubleExtra("hemoCount", 0.0);
+				String[] pixels = data.getStringArrayExtra("hemoPixels");
+				String measure = data.getStringExtra("hemoMeasure");
 				
 				Bundle bundle = new Bundle();
 				bundle.putDouble("hemoCount", count);
 				bundle.putString("patientName", patientName);
 				bundle.putString("patientId", patientId);
-				
+				bundle.putStringArray("hemoPixels", pixels);				
+				bundle.putString("hemoMeasure", measure);
 				ResultFragment result = new ResultFragment();
 				result.setArguments(bundle);
 				

@@ -295,9 +295,14 @@ public class CameraActivity extends ActionBarActivity
 	public void onClick(View v) {
 		if (targetVisible) {
 			double count = mRenderer.getHemoCount();
+			String[] pixels = mRenderer.getHemoPixels();
+			String measure = mRenderer.getHemoMeasure();
 			
 			Intent intent = new Intent();
 			intent.putExtra("hemoCount", count);
+			intent.putExtra("hemoPixels", pixels);
+			intent.putExtra("hemoMeasure", measure);
+			
 			setResult(Activity.RESULT_OK, intent);
 			finish();
 		}
