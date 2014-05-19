@@ -44,7 +44,10 @@ public class ViewFileFragment extends Fragment {
 			CSVReader reader = new CSVReader(new FileReader(filePath));
 			String[] row = null;
 			while ((row = reader.readNext()) != null) {
-				calib += new Formatter().format("%s, %s, %s, %s \n", row[0], row[1], row[2], row[3]);
+				for (String str : row) {
+					calib += str + ", ";
+				}
+				calib += "\n";
 			}
 			reader.close();
 			

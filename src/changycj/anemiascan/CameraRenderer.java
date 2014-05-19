@@ -3,6 +3,7 @@ package changycj.anemiascan;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.LinkedList;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -63,6 +64,8 @@ public class CameraRenderer implements GLSurfaceView.Renderer {
     private int mvpMatrixButtonsHandle = 0;
     
     private Rectangle[] renderRectangle;
+    
+    private LinkedList<Double> last10Obs;
     
     public CameraRenderer(CameraActivity activity,
         SampleApplicationSession session)
@@ -130,6 +133,8 @@ public class CameraRenderer implements GLSurfaceView.Renderer {
     	hemoLvlLocs[5] = getHemoLvlArea(-0.63f, 2.3f, 0);  
     	
     	measureLoc = new Vec3F(1.92f, 0, 0);
+    	
+    	last10Obs = new LinkedList<Double>();
     	
     	// rectangles to render on frames
     	renderRectangle = new Rectangle[8];
@@ -245,10 +250,22 @@ public class CameraRenderer implements GLSurfaceView.Renderer {
         	int measuredPixel = getPixelsOnBitmap(new Vec3F[]{measureLoc}, pose)[0];
         	
         	// fit least squares regression
-        	hemoCount = hemoCountModel(reds, Color.red(measuredPixel));
+        	double measured = hemoCountModel(reds, Color.red(measuredPixel));
         	hemoMeasure = measuredPixel;
         	hemoPixels = pixels;
+        	
+        	// add to list
+        	last10Obs.add(measured);
+        	if (last10Obs.size() > 10) {
+        		last10Obs.removeFirst();
+        	}
             
+        	double sum = 0;
+        	for (double m: last10Obs) {
+        		sum += m;
+        	}
+        	hemoCount = sum / 10;
+        	
             final String message = String.format("%d, %d, %d, %d, %d, %d -- %.3f", 
             		reds[0], reds[1], reds[2],
             		reds[3], reds[4], reds[5], hemoCount); 

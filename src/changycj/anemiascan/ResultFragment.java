@@ -90,10 +90,13 @@ public class ResultFragment extends Fragment implements OnClickListener{
 				
 				try {
 					CSVWriter writer = new CSVWriter(new FileWriter(filename));
-					writer.writeNext(new String[] {"HemoCount", "Red", "Green", "Blue"});
+					writer.writeNext(new String[] {"Calibration", "Red", "Green", "Blue"});
 					for (String pixelString : hemoPixels) {
 						writer.writeNext(pixelString.split("#"));
 					}
+					writer.writeNext(new String[]{""});
+					writer.writeNext(new String[]{"Results:"});
+					writer.writeNext(new String[]{"Measurement", "Red", "Green", "Blue"});
 					writer.writeNext(hemoMeasure.split("#"));
 					writer.close();
 				} catch (IOException e) {
